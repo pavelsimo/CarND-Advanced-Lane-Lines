@@ -169,16 +169,19 @@ def plot_comparison(img1, img2, title1='', title2='', cmap1=None, cmap2=None):
 
 if __name__ == '__main__':
 
+    #
     # step1: undistort image
+    #
+
     img = cv2.imread('test_images/test3.jpg')
     objpoints, imgpoints = load_calibration_parameters(6, 9)
     img_undistort = undistort(img, objpoints, imgpoints)
-    # plot_comparison(
-    #     cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
-    #     cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
-    #     title1='Original Image',
-    #     title2='Undistorted Image'
-    # )
+    plot_comparison(
+        cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
+        cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
+        title1='Original Image',
+        title2='Undistorted Image'
+    )
 
     #
     # step 2: select region of interest
@@ -187,16 +190,11 @@ if __name__ == '__main__':
     vertices = np.array([[(0, img.shape[0] - 50), (550, 430), (720, 430),
                           (img.shape[1], img.shape[0] - 50)]], dtype=np.int32)
 
-    # DEBUG
-    # colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
-    # for point, color in zip(vertices[0], colors):
-    #     draw_point(img_undistort, (point[0], point[1]), color=color)
-    # END DEBUG
     img_crop = region_of_interest(img_undistort, vertices)
     plot_comparison(
         cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
         cv2.cvtColor(img_crop, cv2.COLOR_BGR2RGB),
-        title1='Original Image',
+        title1='Undistorted Image',
         title2='Crop Image',
         cmap2='gray'
     )
@@ -209,7 +207,7 @@ if __name__ == '__main__':
     plot_comparison(
         cv2.cvtColor(img_crop, cv2.COLOR_BGR2RGB),
         img_sobel,
-        title1='Original Image',
+        title1='Crop Image',
         title2='Gradient Image',
         cmap2='gray'
     )
@@ -219,25 +217,13 @@ if __name__ == '__main__':
     #
 
     src = np.array([(0, img.shape[0] - 50), (300, 550), (950, 550), (img.shape[1], img.shape[0] - 50)], dtype=np.float32)
-    # colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
-    # for point, color in zip(src, colors):
-    #     draw_point(img_crop, (point[0], point[1]), color=color)
     dst = np.array([(0, img.shape[0]), (0, 0), (img.shape[1], 0), (img.shape[1], img.shape[0])], dtype=np.float32)
     img_unwarp = unwarp(img_sobel, src, dst)
     plot_comparison(
         img_sobel,
         img_unwarp,
-        title1='Sobel Image',
+        title1='Gradient Image',
         title2='Unwrap Image',
         cmap1='gray',
         cmap2='gray'
     )
-
-    # img_edges = compose_threshold(img_unwarp, s_thresh=(170, 255), thresh=(50, 255))
-    # plot_comparison(
-    #     cv2.cvtColor(img_unwarp, cv2.COLOR_BGR2RGB),
-    #     img_edges,
-    #     title1='Original Image',
-    #     title2='Gradient Image',
-    #     cmap2='gray'
-    # )
