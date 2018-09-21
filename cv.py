@@ -337,18 +337,18 @@ if __name__ == '__main__':
     #
     # step1: undistort image
     #
-    img = cv2.imread('test_images/straight_lines2.jpg')
+    img = cv2.imread('test_images/test1.jpg')
     objpoints, imgpoints = load_calibration_parameters(6, 9)
     img_undistort = undistort(img, objpoints, imgpoints)
 
     # DEBUG
     height, weight = img.shape[0], img.shape[1]
-    src = [(608, 440),  (660, 440), (1135, 720), (178, 720)]
-    dst = [(275, 0), (900, 0), (900, height), (275, height)]
+    src = [(600, 445),  (680, 445), (1135, height), (185, height)]
+    dst = [(310, 0), (980, 0), (980, height), (310, height)]
     #              blue         green        red         cyan
-    # colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
-    # for point, color in zip(dst, colors):
-    #     draw_point(img_undistort, (point[0], point[1]), color=color)
+    colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
+    for point, color in zip(src, colors):
+        draw_point(img, (point[0], point[1]), color=color)
 
 
     plot_comparison(
