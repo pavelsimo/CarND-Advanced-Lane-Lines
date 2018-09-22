@@ -5,28 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class Line2D(object):
-    def __init__(self, x1, y1, x2, y2):
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x2
-        self.y2 = y2
-
-    @staticmethod
-    def from_lst(lst):
-        return Line2D(lst[0], lst[1], lst[2], lst[3])
-
-    @staticmethod
-    def from_vec2d(v1, v2):
-        return Line2D(v1.x, v1.y, v2.x, v2.y)
-
-    def to_lst(self):
-        return [self.x1, self.y1, self.x2, self.y2]
-
-    def __str__(self):
-        return '(%.2f, %.2f, %.2f, %.2f)' % (self.x1, self.y1, self.x2, self.y2)
-
-
 def undistort(img, objpoints, imgpoints):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
@@ -67,6 +45,52 @@ def load_calibration_parameters(height, width, verbose=0):
     return objpoints, imgpoints
 
 
+def mag_threshold(img, sobel_kernel=3, thresh=(0, 255)):
+    # Apply the following steps to img
+    # 1) Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+    # 2) Take the gradient in x and y separately
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
+
+    # 3) Calculate the magnitude
+    mag_sobel = np.sqrt(sobelx ** 2 + sobely ** 2)
+
+    # 4) Scale to 8-bit (0 - 255) and convert to type = np.uint8
+    scaled_sobel = np.uint8(255 * mag_sobel / np.max(mag_sobel))
+
+    # 5) Create a binary mask where mag thresholds are met
+    binary_output = np.zeros_like(scaled_sobel)
+    binary_output[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
+
+    # 6) Return this mask as your binary_output image
+    return binary_output
+
+
+def dir_threshold(img, sobel_kernel=3, thresh=(np.pi / 3, np.pi / 2)):
+    # Apply the following steps to img
+    # 1) Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    # 2) Take the gradient in x and y separately
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
+
+    # 3) Take the absolute value of the x and y gradients
+    abs_sobelx = np.abs(sobelx)
+    abs_sobely = np.abs(sobely)
+
+    # 4) Use np.arctan2(abs_sobely, abs_sobelx) to calculate the direction of the gradient
+    dir_sobel = np.arctan2(abs_sobely, abs_sobelx)
+
+    # 5) Create a binary mask where direction thresholds are met
+    binary_output = np.zeros_like(dir_sobel)
+    binary_output[(dir_sobel >= thresh[0]) & (dir_sobel <= thresh[1])] = 1
+
+    # 6) Return this mask as your binary_output image
+    return binary_output
+
+
 def compose_threshold(img, s_thresh=(170, 255), thresh=(20, 100)):
     # convert to HLS color space and separate the S channel
     hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
@@ -77,6 +101,7 @@ def compose_threshold(img, s_thresh=(170, 255), thresh=(20, 100)):
 
     # take the derivative in x
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
+
     # absolute x derivative to accentuate lines away from horizontal
     abs_sobelx = np.abs(sobelx)
     scaled_sobel = np.uint8(255 * abs_sobelx / np.max(abs_sobelx))
@@ -95,6 +120,23 @@ def compose_threshold(img, s_thresh=(170, 255), thresh=(20, 100)):
 
     return combined_binary
 
+
+def hue_threshold(img, thresh=(90, 255)):
+    # 1) Convert to HLS color space
+    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
+    h = hls[:, :, 0]
+    # 2) Apply a threshold to the S channel
+    binary_output = np.zeros_like(h)
+    binary_output[(h > thresh[0]) & (h <= thresh[1])] = 1
+    # 3) Return a binary image of threshold result
+    return binary_output
+
+
+def combine_threshold(binary1, binary2):
+    """ combine the two binary thresholds"""
+    combined_binary = np.zeros_like(binary1)
+    combined_binary[(binary1 == 1) | (binary2 == 1)] = 1
+    return combined_binary
 
 def region_of_interest(img, vertices):
     """
@@ -130,11 +172,6 @@ def draw_lines(img, lines, color=None, thickness=2):
             cv2.line(img, (x1, y1), (x2, y2), color, thickness)
 
 
-def draw_line(img, line, color=None, thickness=2):
-    color = [255, 0, 0] if color is None else color
-    draw_lines(img, [[[int(x) for x in line.to_lst()]]], color=color, thickness=thickness)
-
-
 def draw_point(img, p, color=None):
     color = [255, 0, 0] if color is None else color
     cv2.circle(img, (p[0], p[1]), 30, color, -1)
@@ -149,13 +186,9 @@ def unwarp(img, src, dst):
 
 
 def histogram(img):
-    # TO-DO: Grab only the bottom half of the image
-    # Lane lines are likely to be mostly vertical nearest to the car
     h, w = img.shape[0], img.shape[1]
     offset = 200
     bottom_half = img[h // 2:h, :]
-    # TO-DO: Sum across image pixels vertically - make sure to set `axis`
-    # i.e. the highest areas of vertical lines should be larger values
     histogram = np.sum(bottom_half, axis=0)
     return histogram
 
@@ -277,6 +310,10 @@ def fit_polynomial(img, verbose=0):
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
 
+    y_eval = np.max(ploty)
+    left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
+    print(left_curverad, right_curverad)
+
     try:
         left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
         right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
@@ -289,19 +326,21 @@ def fit_polynomial(img, verbose=0):
     # colors in the left and right lane regions
     out_img[lefty, leftx] = [255, 0, 0]
     out_img[righty, rightx] = [0, 0, 255]
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
+    plt.plot(left_fitx, ploty, color='green')
+    plt.plot(right_fitx, ploty, color='green')
+    plt.gca().invert_yaxis()  # to visualize as we do the images
 
     return left_fitx, right_fitx, out_img
 
 
-def measure_curvature_pixels(y, left_fit, right_fit, ym_per_pix=30/720, xm_per_pix=3.7/700):
-    """
-    Calculates the curvature of polynomial functions in pixels.
-    """
-    # calculation of R_curve (radius of curvature)
-    left_curverad = ((1 + (2*left_fit[0]*y + left_fit[1])**2)**1.5) / np.absolute(2*left_fit[0])
-    right_curverad = ((1 + (2*right_fit[0]*y + right_fit[1])**2)**1.5) / np.absolute(2*right_fit[0])
+def measure_curvature_real(y_eval, leftx, lefty, rightx, righty, ym_per_pix=30/720, xm_per_pix =3.7/700):
+    left_fit_cr = np.polyfit(lefty * ym_per_pix, leftx * xm_per_pix, 2)
+    right_fit_cr = np.polyfit(righty * ym_per_pix, rightx * xm_per_pix, 2)
+    # Calculation of R_curve (radius of curvature)
+    left_curverad = ((1 + (2 * left_fit_cr[0] * y_eval * ym_per_pix + left_fit_cr[1]) ** 2) ** 1.5) / np.abs(
+        2 * left_fit_cr[0])
+    right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.abs(
+        2 * right_fit_cr[0])
     return left_curverad, right_curverad
 
 
@@ -334,20 +373,24 @@ if __name__ == '__main__':
     #
     # step1: undistort image
     #
-    img = cv2.imread('test_images/straight_lines1.jpg')
-    #img = cv2.imread('test_images/test2.jpg')
+    #img = cv2.imread('test_images/straight_lines1.jpg')
+    img = cv2.imread('test_images/test4.jpg')
     objpoints, imgpoints = load_calibration_parameters(6, 9)
     img_undistort = undistort(img, objpoints, imgpoints)
 
     # DEBUG
     height, weight = img.shape[0], img.shape[1]
     # src = [(600, 445),  (680, 445), (1135, height), (185, height)]
-    src = [(600, 445),  (680, 445), (1200, height), (185, height)]
-    dst = [(310, 0), (980, 0), (980, height), (310, height)]
+    # src = [(600, 445),  (680, 445), (weight - 100, height), (100, height)]
+    # src = [(570, 470), (722, 470), (1110, 720), (220, 720)]
+    src = [(570, 470), (722, 470), (1110, 720), (220, 720)]
+
+    #dst = [(310, 0), (980, 0), (980, height), (310, height)]
+    dst = [(320, 0), (920, 0), (920, 720), (320, 720)]
     #              blue         green        red         cyan
-    # colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
-    # for point, color in zip(src, colors):
-    #     draw_point(img, (point[0], point[1]), color=color)
+    colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
+    for point, color in zip(src, colors):
+        draw_point(img, (point[0], point[1]), color=color)
 
 
     plot_comparison(
@@ -361,7 +404,9 @@ if __name__ == '__main__':
     # step 2: gradient and threshold
     #
 
-    img_sobel = compose_threshold(img_undistort, s_thresh=(170, 255), thresh=(20, 100))
+    img_sobel1 = compose_threshold(img_undistort, s_thresh=(170, 255), thresh=(50, 100))
+    img_sobel2 = hue_threshold(img_undistort, thresh=(11, 39))  # yellow
+    img_sobel = combine_threshold(img_sobel1, img_sobel2)
     plot_comparison(
         cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
         img_sobel,
@@ -378,8 +423,14 @@ if __name__ == '__main__':
     #vertices = np.array([[(690, 440), (1136, 720), (177, 720), (580, 440)]],dtype=np.int32)
     #vertices = np.array([[(0, img.shape[0] - 50), (550, 450), (720, 450), (img.shape[1], img.shape[0] - 50)]], dtype=np.int32)
 
-    #vertices = [[src[0], src[3], src[1], src[2]]]
-    img_crop = region_of_interest(img_sobel, np.int32([src]))
+    src = [(570, 470), (722, 470), (1110, 720), (220, 720)]
+    vertices = np.int32([[
+        (src[0][0] - 60, src[0][1]),
+        (src[1][0] + 60, src[1][1]),
+        (src[2][0] + 60, src[2][1]),
+        (src[3][0] - 60, src[3][1])]]
+    )
+    img_crop = region_of_interest(img_sobel, vertices)
     plot_comparison(
         img_sobel,
         img_crop,
@@ -424,12 +475,7 @@ if __name__ == '__main__':
     )
 
     #
-    # step 7: measuring curvature
-    #
-    print(measure_curvature_pixels(img.shape[0], left_fit, right_fit))
-
-    #
-    #
+    # step 8: draw lane
     #
     draw_lane(img_undistort, img_unwarp, left_fit, right_fit, Minv)
 
