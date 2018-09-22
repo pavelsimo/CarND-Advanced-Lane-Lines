@@ -138,6 +138,7 @@ def combine_threshold(binary1, binary2):
     combined_binary[(binary1 == 1) | (binary2 == 1)] = 1
     return combined_binary
 
+
 def region_of_interest(img, vertices):
     """
     Applies an image mask.
@@ -187,7 +188,6 @@ def unwarp(img, src, dst):
 
 def histogram(img):
     h, w = img.shape[0], img.shape[1]
-    offset = 200
     bottom_half = img[h // 2:h, :]
     histogram = np.sum(bottom_half, axis=0)
     return histogram
@@ -311,6 +311,7 @@ def fit_polynomial(img, verbose=0):
     right_fit = np.polyfit(righty, rightx, 2)
 
     y_eval = np.max(ploty)
+    # TODO(pavel): Return this...
     left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
     print(left_curverad, right_curverad)
 
@@ -326,9 +327,10 @@ def fit_polynomial(img, verbose=0):
     # colors in the left and right lane regions
     out_img[lefty, leftx] = [255, 0, 0]
     out_img[righty, rightx] = [0, 0, 255]
-    plt.plot(left_fitx, ploty, color='green')
-    plt.plot(right_fitx, ploty, color='green')
-    plt.gca().invert_yaxis()  # to visualize as we do the images
+    if verbose:
+        plt.plot(left_fitx, ploty, color='green')
+        plt.plot(right_fitx, ploty, color='green')
+        plt.gca().invert_yaxis()  # to visualize as we do the images
 
     return left_fitx, right_fitx, out_img
 
@@ -344,7 +346,7 @@ def measure_curvature_real(y_eval, leftx, lefty, rightx, righty, ym_per_pix=30/7
     return left_curverad, right_curverad
 
 
-def draw_lane(undist, warped, left_fitx, right_fitx, Minv):
+def draw_lane(undist, warped, left_fitx, right_fitx, Minv, verbose=0):
     # Create an image to draw the lines on
     warp_zero = np.zeros_like(warped).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
@@ -360,12 +362,16 @@ def draw_lane(undist, warped, left_fitx, right_fitx, Minv):
 
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
     newwarp = cv2.warpPerspective(color_warp, Minv, (undist.shape[1], undist.shape[0]))
-    plt.imshow(newwarp)
-    plt.show()
+    if verbose:
+        plt.imshow(newwarp)
+        plt.show()
     # Combine the result with the original image
     result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
-    plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
-    plt.show()
+    if verbose:
+        plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+        plt.show()
+
+    return result
 
 
 if __name__ == '__main__':
@@ -378,20 +384,14 @@ if __name__ == '__main__':
     objpoints, imgpoints = load_calibration_parameters(6, 9)
     img_undistort = undistort(img, objpoints, imgpoints)
 
-    # DEBUG
     height, weight = img.shape[0], img.shape[1]
-    # src = [(600, 445),  (680, 445), (1135, height), (185, height)]
-    # src = [(600, 445),  (680, 445), (weight - 100, height), (100, height)]
-    # src = [(570, 470), (722, 470), (1110, 720), (220, 720)]
     src = [(570, 470), (722, 470), (1110, 720), (220, 720)]
-
-    #dst = [(310, 0), (980, 0), (980, height), (310, height)]
     dst = [(320, 0), (920, 0), (920, 720), (320, 720)]
-    #              blue         green        red         cyan
-    colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
-    for point, color in zip(src, colors):
-        draw_point(img, (point[0], point[1]), color=color)
 
+    #              blue         green        red         cyan
+    # colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
+    # for point, color in zip(src, colors):
+    #     draw_point(img, (point[0], point[1]), color=color)
 
     plot_comparison(
         cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
@@ -418,8 +418,6 @@ if __name__ == '__main__':
     #
     # step 3: select region of interest
     #
-
-
     #vertices = np.array([[(690, 440), (1136, 720), (177, 720), (580, 440)]],dtype=np.int32)
     #vertices = np.array([[(0, img.shape[0] - 50), (550, 450), (720, 450), (img.shape[1], img.shape[0] - 50)]], dtype=np.int32)
 
@@ -477,5 +475,5 @@ if __name__ == '__main__':
     #
     # step 8: draw lane
     #
-    draw_lane(img_undistort, img_unwarp, left_fit, right_fit, Minv)
+    draw_lane(img_undistort, img_unwarp, left_fit, right_fit, Minv, verbose=1)
 
