@@ -45,98 +45,56 @@ def load_calibration_parameters(height, width, verbose=0):
     return objpoints, imgpoints
 
 
-def mag_threshold(img, sobel_kernel=3, thresh=(0, 255)):
-    # Apply the following steps to img
-    # 1) Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-
-    # 2) Take the gradient in x and y separately
-    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
-    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
-
-    # 3) Calculate the magnitude
-    mag_sobel = np.sqrt(sobelx ** 2 + sobely ** 2)
-
-    # 4) Scale to 8-bit (0 - 255) and convert to type = np.uint8
-    scaled_sobel = np.uint8(255 * mag_sobel / np.max(mag_sobel))
-
-    # 5) Create a binary mask where mag thresholds are met
-    binary_output = np.zeros_like(scaled_sobel)
-    binary_output[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
-
-    # 6) Return this mask as your binary_output image
-    return binary_output
-
-
-def dir_threshold(img, sobel_kernel=3, thresh=(np.pi / 3, np.pi / 2)):
-    # Apply the following steps to img
-    # 1) Convert to grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    # 2) Take the gradient in x and y separately
-    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
-    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
-
-    # 3) Take the absolute value of the x and y gradients
-    abs_sobelx = np.abs(sobelx)
-    abs_sobely = np.abs(sobely)
-
-    # 4) Use np.arctan2(abs_sobely, abs_sobelx) to calculate the direction of the gradient
-    dir_sobel = np.arctan2(abs_sobely, abs_sobelx)
-
-    # 5) Create a binary mask where direction thresholds are met
-    binary_output = np.zeros_like(dir_sobel)
-    binary_output[(dir_sobel >= thresh[0]) & (dir_sobel <= thresh[1])] = 1
-
-    # 6) Return this mask as your binary_output image
-    return binary_output
-
-
-def compose_threshold(img, s_thresh=(170, 255), thresh=(20, 100)):
-    # convert to HLS color space and separate the S channel
-    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
-    s_channel = hls[:, :, 2]
-
-    # grayscale image
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # take the derivative in x
-    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
-
-    # absolute x derivative to accentuate lines away from horizontal
-    abs_sobelx = np.abs(sobelx)
-    scaled_sobel = np.uint8(255 * abs_sobelx / np.max(abs_sobelx))
-
-    # threshold x gradient
-    sxbinary = np.zeros_like(scaled_sobel)
-    sxbinary[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
-
-    # threshold color channel
-    s_binary = np.zeros_like(s_channel)
-    s_binary[(s_channel >= s_thresh[0]) & (s_channel <= s_thresh[1])] = 1
-
-    # combine the two binary thresholds
-    combined_binary = np.zeros_like(sxbinary)
-    combined_binary[(s_binary == 1) | (sxbinary == 1)] = 1
-
-    return combined_binary
-
-
-def hue_threshold(img, thresh=(90, 255)):
-    # 1) Convert to HLS color space
-    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
-    h = hls[:, :, 0]
-    # 2) Apply a threshold to the S channel
-    binary_output = np.zeros_like(h)
-    binary_output[(h > thresh[0]) & (h <= thresh[1])] = 1
-    # 3) Return a binary image of threshold result
+def channel_threshold(img, channel=0, thresh=(0, 255)):
+    r = img[:, :, channel]
+    binary_output = np.zeros_like(r)
+    binary_output[(r > thresh[0]) & (r <= thresh[1])] = 1
     return binary_output
 
 
 def combine_threshold(binary1, binary2):
-    """ combine the two binary thresholds"""
     combined_binary = np.zeros_like(binary1)
     combined_binary[(binary1 == 1) | (binary2 == 1)] = 1
     return combined_binary
+
+
+def mag_thresh(img, sobel_kernel=3, thresh=(0, 255)):
+    # convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+    # take the gradient in x and y separately
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
+
+    # calculate the magnitude
+    mag_sobel = np.sqrt(sobelx ** 2 + sobely ** 2)
+
+    # scale to 8-bit (0 - 255) and convert to type = np.uint8
+    scaled_sobel = np.uint8(255 * mag_sobel / np.max(mag_sobel))
+
+    # create a binary mask where mag thresholds are met
+    binary_output = np.zeros_like(scaled_sobel)
+    binary_output[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
+
+    # inversed the mask, so can be combined with color threshold later on...
+    binary_output = 1 - binary_output
+    return binary_output
+
+
+def overlay(img1, img2, x_offset=50, y_offset=50):
+    img1[y_offset:y_offset+img2.shape[0], x_offset:x_offset+img2.shape[1]] = img2
+    return img1
+
+
+def put_text(img, text, font=cv2.FONT_HERSHEY_SIMPLEX, x_offset=0, y_offset=0, scale=1, color=(255, 255, 255), line_type=2):
+    cv2.putText(img, text, (x_offset, y_offset), font, scale, color, line_type)
+
+
+def compose_threshold(img):
+    img1 = channel_threshold(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), channel=2, thresh=(100, 255))
+    img2 = mag_thresh(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), thresh=(0, 50))
+    result = combine_threshold(img1, img2)
+    return result
 
 
 def region_of_interest(img, vertices):
@@ -210,6 +168,22 @@ def plot_comparison(img1, img2, title1='', title2='', cmap1=None, cmap2=None):
 def plot_histogram(y):
     plt.plot(y)
     plt.show()
+
+
+def plot_image_rgb_channels(rgb):
+    # Isolate RGB channels
+    r = rgb[:, :, 0]
+    g = rgb[:, :, 1]
+    b = rgb[:, :, 2]
+
+    # Visualize the individual color channels
+    f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 10))
+    ax1.set_title('R channel')
+    ax1.imshow(r, cmap='gray')
+    ax2.set_title('G channel')
+    ax2.imshow(g, cmap='gray')
+    ax3.set_title('B channel')
+    ax3.imshow(b, cmap='gray')
 
 
 def find_lane_pixels(img, nwindows=9, margin=100, minpix=50):
@@ -311,9 +285,7 @@ def fit_polynomial(img, verbose=0):
     right_fit = np.polyfit(righty, rightx, 2)
 
     y_eval = np.max(ploty)
-    # TODO(pavel): Return this...
-    left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
-    print(left_curverad, right_curverad)
+
 
     try:
         left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
@@ -332,7 +304,8 @@ def fit_polynomial(img, verbose=0):
         plt.plot(right_fitx, ploty, color='green')
         plt.gca().invert_yaxis()  # to visualize as we do the images
 
-    return left_fitx, right_fitx, out_img
+    left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
+    return left_fitx, right_fitx, left_curverad, right_curverad, out_img
 
 
 def measure_curvature_real(y_eval, leftx, lefty, rightx, righty, ym_per_pix=30/720, xm_per_pix =3.7/700):
@@ -347,27 +320,27 @@ def measure_curvature_real(y_eval, leftx, lefty, rightx, righty, ym_per_pix=30/7
 
 
 def draw_lane(undist, warped, left_fitx, right_fitx, Minv, verbose=0):
-    # Create an image to draw the lines on
+    # create an image to draw the lines on
     warp_zero = np.zeros_like(warped).astype(np.uint8)
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
-    # Recast the x and y points into usable format for cv2.fillPoly()
+    # recast the x and y points into usable format for cv2.fillPoly()
     ploty = np.linspace(0, undist.shape[0] - 1, undist.shape[0])
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
     pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
     pts = np.hstack((pts_left, pts_right))
 
-    # Draw the lane onto the warped blank image
+    # draw the lane onto the warped blank image
     cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
-    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    # warp the blank back to original image space using inverse perspective matrix (Minv)
     newwarp = cv2.warpPerspective(color_warp, Minv, (undist.shape[1], undist.shape[0]))
+
+    # combine the result with the original image
+    result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
     if verbose:
         plt.imshow(newwarp)
         plt.show()
-    # Combine the result with the original image
-    result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
-    if verbose:
         plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
         plt.show()
 
@@ -410,7 +383,7 @@ if __name__ == '__main__':
     plot_comparison(
         cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
         img_sobel,
-        title1='Crop Image',
+        title1='Undistorted Image',
         title2='Gradient Image',
         cmap2='gray'
     )
@@ -421,7 +394,6 @@ if __name__ == '__main__':
     #vertices = np.array([[(690, 440), (1136, 720), (177, 720), (580, 440)]],dtype=np.int32)
     #vertices = np.array([[(0, img.shape[0] - 50), (550, 450), (720, 450), (img.shape[1], img.shape[0] - 50)]], dtype=np.int32)
 
-    src = [(570, 470), (722, 470), (1110, 720), (220, 720)]
     vertices = np.int32([[
         (src[0][0] - 60, src[0][1]),
         (src[1][0] + 60, src[1][1]),
