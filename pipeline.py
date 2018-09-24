@@ -53,27 +53,12 @@ class Line(object):
         # step 6: draw lane
         result = draw_lane(img_undistort, result, left_fit, right_fit, Minv)
 
-        # debug
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        bottomLeftCornerOfText = (10, 500)
-        fontScale = 1
-        fontColor = (255, 255, 255)
-        lineType = 2
-        cv2.putText(result, 'Left Curvature: %.3f Right Curvature: %.3f' % (left_curverad, right_curverad),
-                    bottomLeftCornerOfText,
-                    font,
-                    fontScale,
-                    fontColor,
-                    lineType)
-
         img_overlay1 = cv2.resize(img_poly, (256, 144))
         img_overlay2 = cv2.resize(cv2.cvtColor(255*img_sobel, cv2.COLOR_GRAY2RGB), (256, 144))
         result = overlay(result, img_overlay1, x_offset=50, y_offset=50)
         result = overlay(result, img_overlay2, x_offset=316, y_offset=50)
-
-        # s_img = cv2.resize(img_poly, (256, 144))
-        # x_offset = y_offset = 50
-        # result[y_offset:y_offset + s_img.shape[0], x_offset:x_offset + s_img.shape[1]] = s_img
+        text = 'Left Curvature: %.3f Right Curvature: %.3f' % (left_curverad, right_curverad)
+        result = put_text(result, text, x_offset=50, y_offset=266)
 
         return result
 
@@ -91,7 +76,7 @@ if __name__ == '__main__':
         return result
 
     #clip1 = VideoFileClip("project_video.mp4")
-    clip1 = VideoFileClip("project_video.mp4").subclip(11, 20)
+    clip1 = VideoFileClip("project_video.mp4").subclip(21, 30)
     white_clip = clip1.fl_image(pipeline)
     #white_clip = clip1.fl_image(lambda img: img)
     white_clip.write_videofile("output_videos/project_video.mp4", audio=False)

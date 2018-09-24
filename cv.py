@@ -87,7 +87,8 @@ def overlay(img1, img2, x_offset=50, y_offset=50):
 
 
 def put_text(img, text, font=cv2.FONT_HERSHEY_SIMPLEX, x_offset=0, y_offset=0, scale=1, color=(255, 255, 255), line_type=2):
-    cv2.putText(img, text, (x_offset, y_offset), font, scale, color, line_type)
+    result = np.copy(img)
+    return cv2.putText(result, text, (x_offset, y_offset), font, scale, color, line_type)
 
 
 def compose_threshold(img):
