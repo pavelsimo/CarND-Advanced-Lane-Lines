@@ -76,7 +76,7 @@ if __name__ == '__main__':
         return result
 
     #clip1 = VideoFileClip("project_video.mp4")
-    clip1 = VideoFileClip("project_video.mp4").subclip(21, 30)
+    clip1 = VideoFileClip("project_video.mp4")
     white_clip = clip1.fl_image(pipeline)
     #white_clip = clip1.fl_image(lambda img: img)
     white_clip.write_videofile("output_videos/project_video.mp4", audio=False)

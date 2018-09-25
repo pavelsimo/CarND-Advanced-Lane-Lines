@@ -45,19 +45,6 @@ def load_calibration_parameters(height, width, verbose=0):
     return objpoints, imgpoints
 
 
-def channel_threshold(img, channel=0, thresh=(0, 255)):
-    r = img[:, :, channel]
-    binary_output = np.zeros_like(r)
-    binary_output[(r > thresh[0]) & (r <= thresh[1])] = 1
-    return binary_output
-
-
-def combine_threshold(binary1, binary2):
-    combined_binary = np.zeros_like(binary1)
-    combined_binary[(binary1 == 1) | (binary2 == 1)] = 1
-    return combined_binary
-
-
 def mag_thresh(img, sobel_kernel=3, thresh=(0, 255)):
     # convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
@@ -91,10 +78,44 @@ def put_text(img, text, font=cv2.FONT_HERSHEY_SIMPLEX, x_offset=0, y_offset=0, s
     return cv2.putText(result, text, (x_offset, y_offset), font, scale, color, line_type)
 
 
+
+def white_threshold(img, thresh=(0, 255)):
+    r = img[:, :, 0]
+    g = img[:, :, 1]
+    b = img[:, :, 2]
+    binary_output = np.zeros_like(r)
+    binary_output[(r >= thresh[0]) & (r <= thresh[1]) &
+                  (g >= thresh[0]) & (g <= thresh[1]) &
+                  (b >= thresh[0]) & (b <= thresh[1])] = 1
+    return binary_output
+
+
+def channel_threshold(img, channel=0, thresh=(0, 255)):
+    r = img[:, :, channel]
+    binary_output = np.zeros_like(r)
+    binary_output[(r > thresh[0]) & (r <= thresh[1])] = 1
+    return binary_output
+
+
+def combine_threshold(binary1, binary2):
+    combined_binary = np.zeros_like(binary1)
+    combined_binary[(binary1 == 1) | (binary2 == 1)] = 1
+    return combined_binary
+
+
 def compose_threshold(img):
-    img1 = channel_threshold(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), channel=2, thresh=(100, 255))
-    img2 = mag_thresh(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), thresh=(0, 50))
+    # white threshold
+    img1 = white_threshold(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), thresh=(200, 255))
+    # red threshold
+    img2 = channel_threshold(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), channel=2, thresh=(180, 255))
+    # sobel-x
+    img3 = mag_thresh(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), sobel_kernel=21, thresh=(0, 50))
+    # yellow threshold
+    img4 = channel_threshold(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), channel=0, thresh=(20, 30))
+
     result = combine_threshold(img1, img2)
+    result = combine_threshold(result, img3)
+    result = combine_threshold(result, img4)
     return result
 
 
@@ -347,106 +368,106 @@ def draw_lane(undist, warped, left_fitx, right_fitx, Minv, verbose=0):
 
     return result
 
-
-if __name__ == '__main__':
-
-    #
-    # step1: undistort image
-    #
-    #img = cv2.imread('test_images/straight_lines1.jpg')
-    img = cv2.imread('test_images/test4.jpg')
-    objpoints, imgpoints = load_calibration_parameters(6, 9)
-    img_undistort = undistort(img, objpoints, imgpoints)
-
-    height, weight = img.shape[0], img.shape[1]
-    src = [(570, 470), (722, 470), (1110, 720), (220, 720)]
-    dst = [(320, 0), (920, 0), (920, 720), (320, 720)]
-
-    #              blue         green        red         cyan
-    # colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
-    # for point, color in zip(src, colors):
-    #     draw_point(img, (point[0], point[1]), color=color)
-
-    plot_comparison(
-        cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
-        cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
-        title1='Original Image',
-        title2='Undistorted Image'
-    )
-
-    #
-    # step 2: gradient and threshold
-    #
-
-    img_sobel1 = compose_threshold(img_undistort, s_thresh=(170, 255), thresh=(50, 100))
-    img_sobel2 = hue_threshold(img_undistort, thresh=(11, 39))  # yellow
-    img_sobel = combine_threshold(img_sobel1, img_sobel2)
-    plot_comparison(
-        cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
-        img_sobel,
-        title1='Undistorted Image',
-        title2='Gradient Image',
-        cmap2='gray'
-    )
-
-    #
-    # step 3: select region of interest
-    #
-    #vertices = np.array([[(690, 440), (1136, 720), (177, 720), (580, 440)]],dtype=np.int32)
-    #vertices = np.array([[(0, img.shape[0] - 50), (550, 450), (720, 450), (img.shape[1], img.shape[0] - 50)]], dtype=np.int32)
-
-    vertices = np.int32([[
-        (src[0][0] - 60, src[0][1]),
-        (src[1][0] + 60, src[1][1]),
-        (src[2][0] + 60, src[2][1]),
-        (src[3][0] - 60, src[3][1])]]
-    )
-    img_crop = region_of_interest(img_sobel, vertices)
-    plot_comparison(
-        img_sobel,
-        img_crop,
-        title1='Undistorted Image',
-        title2='Crop Image',
-        cmap1='gray',
-        cmap2='gray'
-    )
-
-    #
-    # step 4: perspective transform
-    #
-
-    #src = np.array([(0, img.shape[0] - 50), (300, 470), (950, 470), (img.shape[1], img.shape[0] - 50)], dtype=np.float32)
-    img_unwarp, M, Minv = unwarp(img_crop, np.float32(src), np.float32(dst))
-    plot_comparison(
-        img_crop,
-        img_unwarp,
-        title1='Gradient Image',
-        title2='Unwrap Image',
-        cmap1='gray',
-        cmap2='gray'
-    )
-
-    #
-    # step 5: image histogram
-    #
-    h = histogram(img_unwarp)
-    plot_histogram(h)
-
-    #
-    # step 6: fit poly
-    #
-    left_fit, right_fit, img_poly = fit_polynomial(img_unwarp, verbose=1)
-    plot_comparison(
-        img_unwarp,
-        img_poly,
-        title1='Unwrap Image',
-        title2='Poly Image',
-        cmap1='gray',
-        cmap2='gray'
-    )
-
-    #
-    # step 8: draw lane
-    #
-    draw_lane(img_undistort, img_unwarp, left_fit, right_fit, Minv, verbose=1)
-
+#
+# if __name__ == '__main__':
+#
+#     #
+#     # step1: undistort image
+#     #
+#     #img = cv2.imread('test_images/straight_lines1.jpg')
+#     img = cv2.imread('test_images/test4.jpg')
+#     objpoints, imgpoints = load_calibration_parameters(6, 9)
+#     img_undistort = undistort(img, objpoints, imgpoints)
+#
+#     height, weight = img.shape[0], img.shape[1]
+#     src = [(570, 470), (722, 470), (1110, 720), (220, 720)]
+#     dst = [(320, 0), (920, 0), (920, 720), (320, 720)]
+#
+#     #              blue         green        red         cyan
+#     # colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0]]
+#     # for point, color in zip(src, colors):
+#     #     draw_point(img, (point[0], point[1]), color=color)
+#
+#     plot_comparison(
+#         cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
+#         cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
+#         title1='Original Image',
+#         title2='Undistorted Image'
+#     )
+#
+#     #
+#     # step 2: gradient and threshold
+#     #
+#
+#     img_sobel1 = compose_threshold(img_undistort, s_thresh=(170, 255), thresh=(50, 100))
+#     img_sobel2 = hue_threshold(img_undistort, thresh=(11, 39))  # yellow
+#     img_sobel = combine_threshold(img_sobel1, img_sobel2)
+#     plot_comparison(
+#         cv2.cvtColor(img_undistort, cv2.COLOR_BGR2RGB),
+#         img_sobel,
+#         title1='Undistorted Image',
+#         title2='Gradient Image',
+#         cmap2='gray'
+#     )
+#
+#     #
+#     # step 3: select region of interest
+#     #
+#     #vertices = np.array([[(690, 440), (1136, 720), (177, 720), (580, 440)]],dtype=np.int32)
+#     #vertices = np.array([[(0, img.shape[0] - 50), (550, 450), (720, 450), (img.shape[1], img.shape[0] - 50)]], dtype=np.int32)
+#
+#     vertices = np.int32([[
+#         (src[0][0] - 60, src[0][1]),
+#         (src[1][0] + 60, src[1][1]),
+#         (src[2][0] + 60, src[2][1]),
+#         (src[3][0] - 60, src[3][1])]]
+#     )
+#     img_crop = region_of_interest(img_sobel, vertices)
+#     plot_comparison(
+#         img_sobel,
+#         img_crop,
+#         title1='Undistorted Image',
+#         title2='Crop Image',
+#         cmap1='gray',
+#         cmap2='gray'
+#     )
+#
+#     #
+#     # step 4: perspective transform
+#     #
+#
+#     #src = np.array([(0, img.shape[0] - 50), (300, 470), (950, 470), (img.shape[1], img.shape[0] - 50)], dtype=np.float32)
+#     img_unwarp, M, Minv = unwarp(img_crop, np.float32(src), np.float32(dst))
+#     plot_comparison(
+#         img_crop,
+#         img_unwarp,
+#         title1='Gradient Image',
+#         title2='Unwrap Image',
+#         cmap1='gray',
+#         cmap2='gray'
+#     )
+#
+#     #
+#     # step 5: image histogram
+#     #
+#     h = histogram(img_unwarp)
+#     plot_histogram(h)
+#
+#     #
+#     # step 6: fit poly
+#     #
+#     left_fit, right_fit, img_poly = fit_polynomial(img_unwarp, verbose=1)
+#     plot_comparison(
+#         img_unwarp,
+#         img_poly,
+#         title1='Unwrap Image',
+#         title2='Poly Image',
+#         cmap1='gray',
+#         cmap2='gray'
+#     )
+#
+#     #
+#     # step 8: draw lane
+#     #
+#     draw_lane(img_undistort, img_unwarp, left_fit, right_fit, Minv, verbose=1)
+#
