@@ -12,8 +12,8 @@ objpoints, imgpoints = load_calibration_parameters(6, 9)
 class Lane(object):
     def __init__(self):
         self.samples = 10
-        self.left_fits = [None] * self.samples
-        self.right_fits = [None] * self.samples
+        self.left_fits = [0] * self.samples
+        self.right_fits = [0] * self.samples
         self.left_fit = None
         self.right_fit = None
         self.fit_count = 0
@@ -35,6 +35,13 @@ class Lane(object):
             logger.warning('skipping this frame...')
             logger.warning(e)
 
+        y_eval = np.max(ploty)
+        left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
+
+        outlier_threshold = 50
+        if self.fit_count > self.samples and (left_curverad < outlier_threshold or right_curverad < outlier_threshold):
+            self.skip = True
+
         if self.skip:
             pass  # do nothing...
         else:
@@ -51,7 +58,6 @@ class Lane(object):
 
             self.fit_count += 1
 
-        y_eval = np.max(ploty)
         try:
             left_fitx = self.left_fit[0] * ploty ** 2 + self.left_fit[1] * ploty + self.left_fit[2]
             right_fitx = self.right_fit[0] * ploty ** 2 + self.right_fit[1] * ploty + self.right_fit[2]
@@ -69,7 +75,7 @@ class Lane(object):
             plt.plot(right_fitx, ploty, color='green')
             plt.gca().invert_yaxis()  # to visualize as we do the images
 
-        return left_fitx, right_fitx, y_eval, leftx, lefty, rightx, righty, out_img
+        return left_fitx, right_fitx, left_curverad, right_curverad, out_img
 
     def render(self, img):
         img_undistort = undistort(img, objpoints, imgpoints)
@@ -96,13 +102,12 @@ class Lane(object):
         result, M, Minv = unwarp(result, np.float32(src), np.float32(dst))
 
         # step 5: fit poly
-        left_fit, right_fit, y_eval, leftx, lefty, rightx, righty, img_poly = self.fit_polynomial(result)
-        left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
+        left_fit, right_fit, left_curverad, right_curverad, img_poly = self.fit_polynomial(result)
 
         # step 6: draw lane
         result = draw_lane(img_undistort, result, left_fit, right_fit, Minv)
-        left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
 
+        # step 7: draw pipeline visualizations
         img_overlay1 = cv2.resize(img_poly, (256, 144))
         img_overlay2 = cv2.resize(cv2.cvtColor(255 * img_sobel, cv2.COLOR_GRAY2RGB), (256, 144))
         result = overlay(result, img_overlay1, x_offset=50, y_offset=50)

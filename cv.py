@@ -126,7 +126,7 @@ def mag_thresh(img, sobel_kernel=3, thresh=(0, 255)):
 def compose_threshold(img):
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     # white threshold
-    img1 = white_threshold(img, thresh=(200, 255))
+    img1 = white_threshold(img, thresh=(190, 255))
     # red threshold
     img2 = channel_threshold(img, channel=0, thresh=(220, 255))
     # sobel-x
