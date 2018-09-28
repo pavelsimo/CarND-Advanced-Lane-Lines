@@ -351,7 +351,7 @@ def draw_lane(undist, warped, left_fitx, right_fitx, Minv, verbose=0):
     if verbose:
         plt.imshow(newwarp)
         plt.show()
-        plt.imshow(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+        plt.imshow(result)
         plt.show()
 
     return result
