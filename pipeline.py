@@ -9,10 +9,67 @@ logger = logging.getLogger(__name__)
 objpoints, imgpoints = load_calibration_parameters(6, 9)
 
 
-class Line(object):
+class Lane(object):
     def __init__(self):
-        self.prev_left_curverad = -1
-        self.prev_right_curverad = -1
+        self.samples = 10
+        self.left_fits = [None] * self.samples
+        self.right_fits = [None] * self.samples
+        self.left_fit = None
+        self.right_fit = None
+        self.fit_count = 0
+        self.fit_index = 0
+        self.skip = False
+
+    def fit_polynomial(self, img, verbose=0):
+        # find our lane pixels first
+        leftx, lefty, rightx, righty, out_img = find_lane_pixels(img)
+
+        # fitting a second order polynomial
+        ploty = np.linspace(0, img.shape[0] - 1, img.shape[0])
+        self.skip = False
+        try:
+            left_fit = np.polyfit(lefty, leftx, 2)
+            right_fit = np.polyfit(righty, rightx, 2)
+        except Exception as e:
+            skip = True
+            logger.warning('skipping this frame...')
+            logger.warning(e)
+
+        if self.skip:
+            pass  # do nothing...
+        else:
+            index = self.fit_count % self.samples
+            self.left_fits[index] = left_fit
+            self.right_fits[index] = right_fit
+
+            if self.fit_count >= self.samples:
+                self.left_fit = np.mean(np.array(self.left_fits), axis=0)
+                self.right_fit = np.mean(np.array(self.right_fits), axis=0)
+            else:
+                self.left_fit = left_fit
+                self.right_fit = right_fit
+
+            self.fit_count += 1
+
+        y_eval = np.max(ploty)
+        try:
+            left_fitx = self.left_fit[0] * ploty ** 2 + self.left_fit[1] * ploty + self.left_fit[2]
+            right_fitx = self.right_fit[0] * ploty ** 2 + self.right_fit[1] * ploty + self.right_fit[2]
+        except TypeError:
+            # Avoids an error if `left` and `right_fit` are still none or incorrect
+            print('The function failed to fit a line!')
+            left_fitx = 1 * ploty ** 2 + 1 * ploty
+            right_fitx = 1 * ploty ** 2 + 1 * ploty
+
+        # colors in the left and right lane regions
+        out_img[lefty, leftx] = [255, 0, 0]
+        out_img[righty, rightx] = [0, 0, 255]
+        if verbose:
+            plt.plot(left_fitx, ploty, color='green')
+            plt.plot(right_fitx, ploty, color='green')
+            plt.gca().invert_yaxis()  # to visualize as we do the images
+
+        return left_fitx, right_fitx, y_eval, leftx, lefty, rightx, righty, out_img
 
     def render(self, img):
         img_undistort = undistort(img, objpoints, imgpoints)
@@ -39,22 +96,15 @@ class Line(object):
         result, M, Minv = unwarp(result, np.float32(src), np.float32(dst))
 
         # step 5: fit poly
-        left_fit, right_fit, left_curverad, right_curverad, img_poly = fit_polynomial(result)
-        if self.prev_left_curverad > 0 and self.prev_right_curverad > 0:
-            diff_left_curverad = left_curverad - self.prev_left_curverad
-            diff_right_curverad = right_curverad - self.prev_right_curverad
-        else:
-            diff_left_curverad = 0
-            diff_right_curverad = 0
-
-        self.prev_left_curverad = left_curverad
-        self.prev_right_curverad = right_curverad
+        left_fit, right_fit, y_eval, leftx, lefty, rightx, righty, img_poly = self.fit_polynomial(result)
+        left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
 
         # step 6: draw lane
         result = draw_lane(img_undistort, result, left_fit, right_fit, Minv)
+        left_curverad, right_curverad = measure_curvature_real(y_eval, leftx, lefty, rightx, righty)
 
         img_overlay1 = cv2.resize(img_poly, (256, 144))
-        img_overlay2 = cv2.resize(cv2.cvtColor(255*img_sobel, cv2.COLOR_GRAY2RGB), (256, 144))
+        img_overlay2 = cv2.resize(cv2.cvtColor(255 * img_sobel, cv2.COLOR_GRAY2RGB), (256, 144))
         result = overlay(result, img_overlay1, x_offset=50, y_offset=50)
         result = overlay(result, img_overlay2, x_offset=316, y_offset=50)
         text = 'Left Curvature: %.3f Right Curvature: %.3f' % (left_curverad, right_curverad)
@@ -65,7 +115,7 @@ class Line(object):
 
 if __name__ == '__main__':
 
-    line = Line()
+    line = Lane()
 
     def pipeline(img):
         try:
