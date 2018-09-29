@@ -123,20 +123,33 @@ def mag_thresh(img, sobel_kernel=3, thresh=(0, 255)):
     return binary_output
 
 
-def compose_threshold(img):
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+def compose_threshold(img, verbose=0):
     # white threshold
     img1 = white_threshold(img, thresh=(190, 255))
     # red threshold
     img2 = channel_threshold(img, channel=0, thresh=(220, 255))
     # sobel-x
-    img3 = mag_thresh(img, sobel_kernel=21, thresh=(0, 50))
+    img3 = mag_thresh(img, sobel_kernel=21, thresh=(0, 40))
     # yellow threshold
-    img4 = channel_threshold(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), channel=0, thresh=(20, 30))
+    img4 = channel_threshold(cv2.cvtColor(img, cv2.COLOR_RGB2HSV), channel=0, thresh=(20, 30))
 
     result = combine_threshold(img1, img2)
     result = combine_threshold(result, img3)
     result = combine_threshold(result, img4)
+
+    if verbose:
+        f, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, figsize=(40, 30))
+        ax1.set_title('white threshold')
+        ax1.imshow(img1, cmap='gray')
+        ax2.set_title('red threshold')
+        ax2.imshow(img2, cmap='gray')
+        ax3.set_title('sobel-x')
+        ax3.imshow(img3, cmap='gray')
+        ax4.set_title('yellow threshold')
+        ax4.imshow(img3, cmap='gray')
+        ax5.set_title('binary result')
+        ax5.imshow(result, cmap='gray')
+
     return result
 
 
@@ -179,7 +192,7 @@ def draw_point(img, p, color=None):
     cv2.circle(img, (p[0], p[1]), 30, color, -1)
 
 
-def unwarp(img, src, dst):
+def warper(img, src, dst):
     img_size = (img.shape[1], img.shape[0])
     M = cv2.getPerspectiveTransform(src, dst)
     Minv = cv2.getPerspectiveTransform(dst, src)
