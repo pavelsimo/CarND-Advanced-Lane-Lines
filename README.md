@@ -78,6 +78,7 @@ transformations:
 
 ![alt text][image9]
 
+### Birds-eye View
 
 The code for my perspective transform includes a function called `warper()`, which appears in lines 195 through 200 
 in the file `cv.py`. The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  
@@ -111,11 +112,15 @@ I verified that my perspective transform was working as expected by drawing the 
 points onto a test image and its warped counterpart to verify that the lines appear parallel 
 in the warped image.
 
+### Detecting the Lanes
+
 ![alt text][image4]
 
 Then I used a histogram on the x-axis to fit my lane lines with a 2nd order polynomial kinda like this:
 
 ![alt text][image10] ![alt text][image5]
+
+### Curvature
 
 For each lane mark we fit a parabola with coefficients A, B and C as follow:
 
@@ -128,19 +133,46 @@ Our equation for curvature becomes:
 Note that we need to multiple the pixel coefficients with a meter multiplier, to have the results in meters.
 I implemented the curvature measurements in lines 170 through 178 in my code in `lane.py`
 
+### Unwrapping the Bird-eyes View 
+
 Finally, I used the function `unwrap` to project the lane back to the road, I implemented 
 this step in lines 180 through 205 in my code in `lane.py`. Here is an example of 
 my result on a test image:  
 
 ![alt text][image13]
 
-
 Here's a [link to my video result](./project_video_output.mp4)
 
----
+### Further Work
 
-### Discussion
+Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail 
+and how I might improve it if I were going to pursue this project further.
 
-#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+My approach used the following techniques:
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+- Combination of gradient (sobel-x) and color thresholds for yellow and white lane marks, this was really helpful since
+the multiple layers of threshold and gradient redundancy improve the quality of the binary image, thus improving lane detection. 
+For instance, under low lighting conditions the RGB red threshold did not perform well, but the HSV yellow threshold worked quite good. 
+
+- Smoothing by averaging the coefficients of the lane marks parabolas within the last 5 frames, this help avoiding 
+bad frames from skew the detection results. 
+
+- Filter out outlier frames by using a curvature threshold, same as the point above, improve lane detection for 
+noisy frames.
+
+If were to pursue this project further I will try to improve the following:
+
+- Consider different environment conditions, for instance, night, snow, etc. This can be improved by dynamic color 
+thresholds.
+
+- Dynamic image wrapping points, at the moment the points are hardcoded, this will fail under lanes with a different configuration,
+consider for instance, wider or narrow lanes. A better approach will attempt to detect those control points.
+
+- Consider lanes with high curvature, in those cases just a section of the lane is visible, because of this drawing the lane
+should only depend upon one of the lane marks.
+
+- Consider not visible lanes, this could happen either for missing lane marks on the road or occlusion from other objects, 
+in those cases we need to either extrapolate the lane based on the width of the road, or based on a estimation of 
+previous measurements, my approach will fall apart on those cases.
+  
+- Consider machine learning approach, it's possible to build a CNN to predict 4 points corresponding to the lane area.

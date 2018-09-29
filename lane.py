@@ -274,4 +274,4 @@ if __name__ == '__main__':
 
     clip1 = VideoFileClip("project_video.mp4")
     white_clip = clip1.fl_image(pipeline)
-    white_clip.write_videofile("output_videos/project_video2.mp4", audio=False)
+    white_clip.write_videofile("project_video_output.mp4", audio=False)
