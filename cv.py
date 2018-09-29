@@ -155,11 +155,8 @@ def compose_threshold(img, verbose=0):
 
 def region_of_interest(img, vertices):
     """
-    Applies an image mask.
-
-    Only keeps the region of the image defined by the polygon
-    formed from `vertices`. The rest of the image is set to black.
-    `vertices` should be a numpy array of integer points.
+    Crop the region of interest, only keeps the region of the image defined by the polygon
+    formed from `vertices`.
     """
 
     # defining a blank mask to start with

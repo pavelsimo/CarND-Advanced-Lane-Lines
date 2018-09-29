@@ -24,13 +24,17 @@ My project includes the following files:
 [image1]: ./output_images/undistorted_image.png "Undistorted"
 [image2]: ./output_images/road_undistorted_image.png "Road Transformed"
 [image3]: ./output_images/binary_image.png "Binary Example"
-[image7]: ./output_images/binary_1.png "Binary Example 1"
-[image8]: ./output_images/binary_2.png "Binary Example 2"
-[image9]: ./output_images/binary_pipeline.png "Binary Pipeline"
 [image4]: ./output_images/birdseye_image.png "Warp Example"
 [image5]: ./output_images/fit_lane.png "Fit Visual"
 [image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
+[image7]: ./output_images/binary_1.png "Binary Example 1"
+[image8]: ./output_images/binary_2.png "Binary Example 2"
+[image9]: ./output_images/binary_pipeline.png "Binary Pipeline"
+[image10]: ./output_images/histogram.png "Birds-eye histogram"
+[image11]: ./output_images/poly.png "Parabola Equation"
+[image12]: ./output_images/curvature.png "Curvature"
+[image13]: ./output_images/lane_detection.png "Lane Detection"
+[video1]: ./project_video_output.mp4 "Video"
 
 ### Camera Calibration
 
@@ -75,8 +79,6 @@ transformations:
 ![alt text][image9]
 
 
-#### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
-
 The code for my perspective transform includes a function called `warper()`, which appears in lines 195 through 200 
 in the file `cv.py`. The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  
 I chose the hardcode the source and destination points in the following manner:
@@ -106,31 +108,34 @@ This resulted in the following source and destination points:
 | 220, 720      | 320, 720        |
 
 I verified that my perspective transform was working as expected by drawing the `src` and `dst` 
-points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
+points onto a test image and its warped counterpart to verify that the lines appear parallel 
+in the warped image.
 
 ![alt text][image4]
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+Then I used a histogram on the x-axis to fit my lane lines with a 2nd order polynomial kinda like this:
 
-![alt text][image5]
+![alt text][image10] ![alt text][image5]
 
-#### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
+For each lane mark we fit a parabola with coefficients A, B and C as follow:
 
-I did this in lines # through # in my code in `my_other_file.py`
+![alt text][image11]
 
-#### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
+Our equation for curvature becomes:
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+![alt text][image12]
 
-![alt text][image6]
+Note that we need to multiple the pixel coefficients with a meter multiplier, to have the results in meters.
+I implemented the curvature measurements in lines 170 through 178 in my code in `lane.py`
 
----
+Finally, I used the function `unwrap` to project the lane back to the road, I implemented 
+this step in lines 180 through 205 in my code in `lane.py`. Here is an example of 
+my result on a test image:  
 
-### Pipeline (video)
+![alt text][image13]
 
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./project_video_output.mp4)
 
 ---
 

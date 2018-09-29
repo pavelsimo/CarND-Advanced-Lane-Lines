@@ -177,7 +177,7 @@ class Lane(object):
             2 * right_fit_cr[0])
         return left_curverad, right_curverad
 
-    def unwrap_lane(self, undist, warped, left_fitx, right_fitx, Minv, verbose=0):
+    def unwrap(self, undist, warped, left_fitx, right_fitx, Minv, verbose=0):
         # create an image to draw the lines on
         warp_zero = np.zeros_like(warped).astype(np.uint8)
         color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
@@ -246,7 +246,7 @@ class Lane(object):
             plt.show()
 
         # step 6: draw lane
-        result = self.unwrap_lane(img_undistort, result, left_fit, right_fit, Minv, verbose=verbose)
+        result = self.unwrap(img_undistort, result, left_fit, right_fit, Minv, verbose=verbose)
 
         # step 7: draw pipeline visualizations
         img_overlay1 = cv2.resize(img_poly, (256, 144))
